@@ -1,56 +1,56 @@
-from typing import List, Optional
-from app.models.task import tasks_db, Task
-from app.models.schemas import TaskCreate, TaskUpdate
 from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+from app.repositories.task_repository import TaskRepository
+from app.models.schemas import TaskCreate, TaskUpdate
+from app.config.settings import settings
 
 class TaskService:
     @staticmethod
-    def create_task(task_data: TaskCreate) -> Task:
-        """Создание новой задачи"""
-        task = Task(
-            title=task_data.title,
-            description=task_data.description,
-            priority=task_data.priority
-        )
-        tasks_db[task.id] = task
-        return task
-    
+    def create_task(db: Session, task_data: TaskCreate, user_id: str):
+        task_repo = TaskRepository(db)
+        
+        # Проверка лимита задач
+        if task_repo.count_by_user(user_id) >= settings.MAX_TASKS_PER_USER:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Maximum {settings.MAX_TASKS_PER_USER} tasks per user reached"
+            )
+        
+        return task_repo.create({
+            "title": task_data.title,
+            "description": task_data.description,
+            "priority": task_data.priority,
+            "user_id": user_id
+        })
+
     @staticmethod
-    def get_all_tasks() -> List[Task]:
-        """Получение всех задач"""
-        return list(tasks_db.values())
-    
+    def get_all_tasks(db: Session, user_id: str, skip: int = 0, limit: int = 100):
+        task_repo = TaskRepository(db)
+        return task_repo.get_by_user(user_id, skip, limit)
+
     @staticmethod
-    def get_task(task_id: str) -> Task:
-        """Получение задачи по ID"""
-        task = tasks_db.get(task_id)
-        if not task:
+    def get_task(db: Session, task_id: str, user_id: str):
+        task_repo = TaskRepository(db)
+        task = task_repo.get(task_id)
+        
+        if not task or task.user_id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Task with id {task_id} not found"
+                detail="Task not found"
             )
         return task
-    
+
     @staticmethod
-    def update_task(task_id: str, task_update: TaskUpdate) -> Task:
-        """Обновление задачи"""
-        task = TaskService.get_task(task_id)
+    def update_task(db: Session, task_id: str, task_update: TaskUpdate, user_id: str):
+        task = TaskService.get_task(db, task_id, user_id)  # Проверка прав
         
-        # Фильтруем None значения
-        update_data = {k: v for k, v in task_update.model_dump().items() 
-                      if v is not None}
-        
+        update_data = {k: v for k, v in task_update.model_dump().items() if v is not None}
         if update_data:
-            task.update(**update_data)
+            task = TaskRepository(db).update(task_id, update_data)
         
         return task
-    
+
     @staticmethod
-    def delete_task(task_id: str) -> None:
-        """Удаление задачи"""
-        if task_id not in tasks_db:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Task with id {task_id} not found"
-            )
-        del tasks_db[task_id]
+    def delete_task(db: Session, task_id: str, user_id: str):
+        task = TaskService.get_task(db, task_id, user_id)  # Проверка прав
+        TaskRepository(db).delete(task_id)

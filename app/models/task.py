@@ -1,34 +1,34 @@
-from typing import Optional, Dict, Any
-from datetime import datetime
+from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+from app.database import Base
 import uuid
 
-class Task:
-    def __init__(self, title: str, description: Optional[str] = None, 
-                 priority: str = "medium"):
-        self.id = str(uuid.uuid4())
-        self.title = title
-        self.description = description
-        self.priority = priority
-        self.completed = False
-        self.created_at = datetime.now()
-        self.updated_at = datetime.now()
+class Task(Base):
+    __tablename__ = "tasks"
     
-    def update(self, **kwargs):
-        for key, value in kwargs.items():
-            if hasattr(self, key) and value is not None:
-                setattr(self, key, value)
-        self.updated_at = datetime.now()
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    title = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    priority = Column(String(20), default="medium")  # low, medium, high, critical
+    completed = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    def to_dict(self) -> Dict[str, Any]:
+    # Foreign Key
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="tasks") 
+    
+    def to_dict(self) -> dict:
         return {
             "id": self.id,
             "title": self.title,
             "description": self.description,
             "priority": self.priority,
             "completed": self.completed,
-            "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat()
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "user_id": self.user_id
         }
-
-# In-memory storage
-tasks_db: Dict[str, Task] = {}

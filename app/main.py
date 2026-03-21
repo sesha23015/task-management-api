@@ -1,12 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import tasks
+from app.database import engine, Base
+from app.routers import tasks, auth
 from app.config.settings import settings
+
+# Создание таблиц БД
+Base.metadata.create_all(bind=engine)
 
 # Создание экземпляра приложения
 app = FastAPI(
     title=settings.APP_NAME,
-    description="API для управления задачами",
+    description="API для управления задачами с аутентификацией",
     version=settings.APP_VERSION
 )
 
@@ -20,6 +24,7 @@ app.add_middleware(
 )
 
 # Подключение роутеров
+app.include_router(auth.router)
 app.include_router(tasks.router)
 
 @app.get("/", tags=["Root"])
@@ -38,5 +43,6 @@ async def health_check():
     return {
         "status": "healthy",
         "python_version": "3.12",
-        "app_version": settings.APP_VERSION
+        "app_version": settings.APP_VERSION,
+        "database": "connected"
     }
