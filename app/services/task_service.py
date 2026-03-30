@@ -1,56 +1,61 @@
-from fastapi import HTTPException, status
+from typing import List, Optional
 from sqlalchemy.orm import Session
-from app.repositories.task_repository import TaskRepository
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from app.models.task import Task
 from app.models.schemas import TaskCreate, TaskUpdate
-from app.config.settings import settings
+from app.exceptions import TaskNotFound
+from fastapi import status
 
 class TaskService:
     @staticmethod
-    def create_task(db: Session, task_data: TaskCreate, user_id: str):
-        task_repo = TaskRepository(db)
-        
-        # Проверка лимита задач
-        if task_repo.count_by_user(user_id) >= settings.MAX_TASKS_PER_USER:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Maximum {settings.MAX_TASKS_PER_USER} tasks per user reached"
-            )
-        
-        return task_repo.create({
-            "title": task_data.title,
-            "description": task_data.description,
-            "priority": task_data.priority,
-            "user_id": user_id
-        })
-
-    @staticmethod
-    def get_all_tasks(db: Session, user_id: str, skip: int = 0, limit: int = 100):
-        task_repo = TaskRepository(db)
-        return task_repo.get_by_user(user_id, skip, limit)
-
-    @staticmethod
-    def get_task(db: Session, task_id: str, user_id: str):
-        task_repo = TaskRepository(db)
-        task = task_repo.get(task_id)
-        
-        if not task or task.user_id != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Task not found"
-            )
+    async def create_task(db: AsyncSession, task_ TaskCreate, user_id: str) -> Task:
+        task = Task(
+            title=task_data.title,
+            description=task_data.description,
+            priority=task_data.priority,
+            user_id=user_id
+        )
+        db.add(task)
+        await db.commit()
+        await db.refresh(task)
         return task
-
+    
     @staticmethod
-    def update_task(db: Session, task_id: str, task_update: TaskUpdate, user_id: str):
-        task = TaskService.get_task(db, task_id, user_id)  # Проверка прав
+    async def get_all_tasks(db: AsyncSession, user_id: str, skip: int = 0, limit: int = 100) -> List[Task]:
+        result = await db.execute(
+            select(Task)
+            .where(Task.user_id == user_id)
+            .offset(skip)
+            .limit(limit)
+        )
+        return result.scalars().all()
+    
+    @staticmethod
+    async def get_task(db: AsyncSession, task_id: str, user_id: str) -> Task:
+        result = await db.execute(
+            select(Task).where(Task.id == task_id, Task.user_id == user_id)
+        )
+        task = result.scalar_one_or_none()
+        if not task:
+            raise TaskNotFound(task_id)
+        return task
+    
+    @staticmethod
+    async def update_task(db: AsyncSession, task_id: str, task_update: TaskUpdate, user_id: str) -> Task:
+        task = await TaskService.get_task(db, task_id, user_id)
         
         update_data = {k: v for k, v in task_update.model_dump().items() if v is not None}
-        if update_data:
-            task = TaskRepository(db).update(task_id, update_data)
         
+        for key, value in update_data.items():
+            setattr(task, key, value)
+        
+        await db.commit()
+        await db.refresh(task)
         return task
-
+    
     @staticmethod
-    def delete_task(db: Session, task_id: str, user_id: str):
-        task = TaskService.get_task(db, task_id, user_id)  # Проверка прав
-        TaskRepository(db).delete(task_id)
+    async def delete_task(db: AsyncSession, task_id: str, user_id: str) -> None:
+        task = await TaskService.get_task(db, task_id, user_id)
+        await db.delete(task)
+        await db.commit()

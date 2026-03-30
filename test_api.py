@@ -10,8 +10,8 @@ def test_create_task():
 
     print("\n" "1. Создание задачи")
     task_data = {
-        "title": "Изучить Python 3.12",
-        "description": "Освоить новые возможности Python 3.12",
+        "title": "Понять смысл жизни",
+        "description": "Смириться со смертью",
         "priority": "high"
     }
     
@@ -35,7 +35,7 @@ def test_create_task():
         return None
 
 def test_get_all_tasks():
-    
+
     print("\n 2. ПОЛУЧЕНИЕ ВСЕХ ЗАДАЧ")
     try:
         response = requests.get(f"{BASE_URL}/tasks/")
