@@ -8,7 +8,7 @@ from app.utils.security import get_current_active_user
 from app.models.user import User
 from app.models.task import Task
 
-router = APIRouter(prefix="/tasks", tags=["tasks"], dependencies=[Depends(get_current_active_user)])
+router = APIRouter(prefix="/v1/tasks", tags=["tasks"], dependencies=[Depends(get_current_active_user)])
 
 @router.post(
     "/",
@@ -21,7 +21,6 @@ async def create_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> TaskResponse:
-    """Создание новой задачи для текущего пользователя"""
     new_task = TaskService.create_task(db, task, current_user.id)
     return TaskResponse.model_validate(new_task)
 
@@ -36,7 +35,6 @@ async def get_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> List[TaskResponse]:
-    """Возвращает список задач текущего пользователя"""
     tasks = TaskService.get_all_tasks(db, current_user.id, skip, limit)
     return [TaskResponse.model_validate(task) for task in tasks]
 
@@ -50,7 +48,6 @@ async def get_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> TaskResponse:
-    """Возвращает конкретную задачу по её ID"""
     task = TaskService.get_task(db, task_id, current_user.id)
     return TaskResponse.model_validate(task)
 
@@ -65,7 +62,6 @@ async def update_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> TaskResponse:
-    """Обновляет существующую задачу"""
     updated_task = TaskService.update_task(db, task_id, task_update, current_user.id)
     return TaskResponse.model_validate(updated_task)
 
@@ -79,5 +75,4 @@ async def delete_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> None:
-    """Удаляет задачу по ID"""
     TaskService.delete_task(db, task_id, current_user.id)

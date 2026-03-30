@@ -7,7 +7,7 @@ import sys
 BASE_URL = "http://localhost:8000"
 
 def test_create_task():
-    """Тест создания задачи"""
+
     print("\n" "1. Создание задачи")
     task_data = {
         "title": "Изучить Python 3.12",
@@ -35,7 +35,7 @@ def test_create_task():
         return None
 
 def test_get_all_tasks():
-    """Тест получения всех задач"""
+    
     print("\n 2. ПОЛУЧЕНИЕ ВСЕХ ЗАДАЧ")
     try:
         response = requests.get(f"{BASE_URL}/tasks/")
@@ -49,7 +49,7 @@ def test_get_all_tasks():
         return []
 
 def test_health():
-    """Тест проверки здоровья API"""
+
     print("\n Проверка здоровья API")
     try:
         response = requests.get(f"{BASE_URL}/health")
@@ -66,27 +66,21 @@ def test_health():
         return False
 
 def main():
-    print_separator()
-    print("ТЕСТИРОВАНИЕ TASK MANAGEMENT API")
-    print_separator()
-    
-    # Сначала проверим здоровье API
+    print("Тестирование TASK MANAGEMENT API")
+        
     if not test_health():
         print("\n API не запущено. Запустите сервер:")
         print("   uvicorn app.main:app --reload")
         return
     
-    # Создание задачи
     task = test_create_task()
     if task:
         time.sleep(1)
         
-        # Получение всех задач
         test_get_all_tasks()
         
         time.sleep(1)
         
-        # Проверка удаления
         print(f"\n Удаление задачи {task['id'][:8]}...")
         try:
             response = requests.delete(f"{BASE_URL}/tasks/{task['id']}")
